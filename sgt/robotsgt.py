@@ -21,11 +21,50 @@ import re
 
 
 
+site_url = "https://aquanimavdi.sharepoint.com/sites/DDBBCE"
+usersp="francisco.alvarez@aquanimaservices.com"
+passsp="Aquanima.2023"
 
+def descarga_sp(site_url,usersp,passsp):
+    
+    ctx = ClientContext(site_url).with_credentials(UserCredential(usersp, passsp))
+    file_relative_path = "/sites/DDBBCE/Documentos compartidos/SGTBBDD/Informe pedidos.xls"
 
-def descarga_sp():
+    file_relative_path2 = "/sites/DDBBCE/Documentos compartidos/SGTBBDD/Informe solicitudes.zip"
+    file_relative_path3 = "/sites/DDBBCE/Documentos compartidos/SGTBBDD/BBDD.xlsx"
+    file_relative_path4 = "/sites/DDBBCE/Documentos compartidos/SGTBBDD/informe-SGT.xlsx"
 
-    pass
+    response = File.open_binary(ctx, file_relative_path)
+    bytes_file_obj= io.BytesIO()
+    bytes_file_obj.write(response.content)
+    bytes_file_obj.seek(0)
+
+    response2= File.open_binary(ctx,file_relative_path2)
+    bytes_file_obj1= io.BytesIO()
+    bytes_file_obj1.write(response2.content)
+    bytes_file_obj1.seek(0)
+
+    response3= File.open_binary(ctx,file_relative_path3)
+    bytes_file_obj2= io.BytesIO()
+    bytes_file_obj2.write(response3.content)
+    bytes_file_obj2.seek(0)
+   
+    response4= File.open_binary(ctx,file_relative_path4)
+    bytes_file_obj4= io.BytesIO()
+    bytes_file_obj4.write(response4.content)
+    bytes_file_obj4.seek(0)
+
+    with open('./sgt/Seguimiento de pedidos.xls', 'wb') as f:
+        f.write(bytes_file_obj.getvalue())
+    
+    with open('./sgt/archivo.zip', 'wb') as f:
+        f.write(bytes_file_obj1.getvalue())
+    with open('./sgt/BBDD1.xlsx', 'wb') as f:
+        f.write(bytes_file_obj2.getvalue())
+
+    with open('./sgt/INFORME_SGT.xlsx', 'wb') as f:
+        f.write(bytes_file_obj4.getvalue())
+        pass
 
 
 
@@ -289,7 +328,6 @@ def informe_solicitudes():
 
         ########
 
-
         i=datetime.now()
         #contratos de sharepoint dashboard LAH
         dfcontract='./sgt/contratos.pkl' ###CAMBIAR AL ARCHIVO QUE REALMENTE VA A LEER
@@ -345,6 +383,7 @@ def informe_solicitudes():
         dfbbdd = dfbbdd.iloc[1:]
 
         dfbbdd=dfbbdd[dfbbdd["AÑO"]!=2024]
+        print(dfbbdd)
         dfbbdd = dfbbdd.iloc[:, :24]
         dfbbdd = dfbbdd.iloc[:-1]
         old_column_names = ['F/INICIO DE ACTIVIDAD ', 'F/FIN DE ACTIVIDAD ','F. NOTIFICACIÓN\n']
@@ -516,7 +555,7 @@ def informe_solicitudes():
 
 
 
-
+#descarga_sp(site_url,usersp,passsp)
 informe_solicitudes()
 #xl_archivocliente()
 print(f'Tiempo total:', time.time()-start_time)
