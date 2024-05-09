@@ -79,15 +79,25 @@ sourcing_ariba='./sgt/sourcing.xlsx'
 df_sourcing_ariba=pd.read_excel(sourcing_ariba)
 
 df_contract_ariba=pd.read_excel(contracts_ariba)
+df_contract_ariba['Contract Id'] = df_contract_ariba['Contract Id'].astype(str)
+
 
 df_sourcing_ariba['Cost Line ID2']=df_sourcing_ariba['Cost Line ID'].replace({'-0000000001': '', '-0000000002': ''}, regex=True)
 df_sourcing_ariba['Associated CW2'] = df_sourcing_ariba['Associated CW'].str.split('[', n=1).str[0].str.replace(' ', '')
+df_sourcing_ariba= df_sourcing_ariba.drop(columns=['Owner Name'])
 
 
-df_status_Ariba = pd.merge(df_sourcing_ariba, df_contract_ariba[['Contract Id', 'OLD Buckets']], how='left', left_on='Associated CW2', right_on='Contract Id')
+print(df_contract_ariba.columns)
+df_status_Ariba = pd.merge(df_sourcing_ariba, df_contract_ariba[['Contract Id', 'OLD Buckets','Owner Name','Effective Date - Date','Expiration Date - Date','Supplier - Common Supplier','Supplier Tax ID']], how='left', left_on='Associated CW2', right_on='Contract Id')
 #"con este df se busca la columna documentacion de nuevabbddd para las s olicitudes que no tienen contrato escrito dentoer de las bases"
-df_status_Ariba = df_status_Ariba[['Cost Line ID2','Contract Id','OLD Buckets','Owner Name']]
+print(df_status_Ariba.columns)
+df_status_Ariba = df_status_Ariba[['Cost Line ID2','OLD Buckets','Contract Id','Owner Name','Effective Date - Date','Expiration Date - Date','Supplier - Common Supplier','Supplier Tax ID']]
 
+
+print(df_status_Ariba.columns)
+
+fila_contrato = df_contract_ariba.loc[df_contract_ariba['Contract Id'] == 'CW267265']
+print(fila_contrato)
 
 #region Filtros
 control= ["4. CONTRATACIÓN DOTACIÓN DE FONDOS","5D.AUDITORÍA ANUAL DE CUENTAS","5F2.PRESIDENCIA-ALTA DIRECCIÓN","5F3.ESTRATÉGICOS.OPERATIVOS.NEGOCIO","5F3.ESTRATÉGICOS.OPERATIVOS.NEGOCIO",
@@ -161,7 +171,7 @@ def crear_archivo_SGT(origen, destino, hojas_a_mantener, dfs_a_agregar):
         # Formato de fecha deseado
     date_style = NamedStyle(name='date_style', number_format='DD/MM/YYYY')
 
-    columnas_fecha = ['FECHA INICIO SAP', 'FECHA FIN SAP', 'HOY', 'F/ NOTIFICACIÓN\n', 'F/DOCUMENTO SUBSIGUIENTE', 'F/FIN DE ACTIVIDAD',  'F/ APROBACIÓN']
+    columnas_fecha = ['FECHA INICIO SAP', 'FECHA FIN SAP', 'HOY', 'F/ NOTIFICACIÓN\n', 'F/DOCUMENTO SUBSIGUIENTE', 'F/FIN DE ACTIVIDAD',  'F/ APROBACIÓN','FECHA INICIO LAH','FECHA FIN LAH']
     for hoja in wb_destino.sheetnames:
         ws = wb_destino[hoja]
         for columna in columnas_fecha:
@@ -290,7 +300,7 @@ def informe_solicitudes():
         dfbbdd= pd.read_excel(bbdd_sp,sheet_name='SOLICITUDES')
         dfrc= pd.read_excel(bbdd_sp,sheet_name="RC")
         dfrc['id servicio'] = dfrc['id servicio'].astype('object')
-        idioma_rc= {'Critical':'Crítico','High':'Alto','Medium':'Medio','Low':'Bajo','No Risk':'Sin riesgo','Very low':'Muy bajo'}
+        idioma_rc= {'Crítico':'Critical','Alto':'High','Medio':'Medium','Bajo':'Low','Sin riesgo':'No Risk','Muy bajo':'Very low'}
 
         dfrc['RISK'] = dfrc['RISK'].replace(idioma_rc)
 
@@ -425,8 +435,7 @@ def informe_solicitudes():
         ######
 
         nuevo_dfbbdd = pd.concat([dfbbdd, df], ignore_index=True)
-        print(nuevo_dfbbdd.columns)
-        print(nuevo_dfbbdd)
+ 
 
 
         #nuevo_dfbbdd = nuevo_dfbbdd.drop_duplicates(subset='Propuesta', keep='first')
@@ -462,10 +471,10 @@ def informe_solicitudes():
         nuevo_dfbbdd['DOCUMENTACIÓN'] = np.where(nuevo_dfbbdd['DOCUMENTACIÓN']=='', nuevo_dfbbdd['Contract Id'], nuevo_dfbbdd['DOCUMENTACIÓN'])
         #luego lo mismo con documentación, pero no solo los vacíos.
         nuevo_dfbbdd=nuevo_dfbbdd.drop(columns=['SOLICITUD000', 'Cost Line ID2','Contract Id' ])
-
+        nuevo_dfbbdd['ID CONTRATO']=nuevo_dfbbdd['ID CONTRATO'].astype(str)
         nuevo_dfbbdd=pd.merge(nuevo_dfbbdd,df_contract_ariba[['Contract Id','OLD Buckets','Owner Name','Effective Date - Date', 'Expiration Date - Date']],how='left',left_on='ID CONTRATO' ,right_on='Contract Id')
         
-        nuevo_dfbbdd['DOCUMENTACIÓN'] = np.where(nuevo_dfbbdd['DOCUMENTACIÓN']=='', nuevo_dfbbdd['OLD Buckets'], nuevo_dfbbdd['DOCUMENTACIÓN'])
+        nuevo_dfbbdd['DOCUMENTACIÓN'] = np.where(nuevo_dfbbdd['DOCUMENTACIÓN']=='' , nuevo_dfbbdd['OLD Buckets'], nuevo_dfbbdd['DOCUMENTACIÓN'])
         nuevo_dfbbdd['ANALISTA'] = np.where(nuevo_dfbbdd['ANALISTA']=='', nuevo_dfbbdd['Owner Name'], nuevo_dfbbdd['ANALISTA'])
         nuevo_dfbbdd['DOCUMENTACIÓN'] = nuevo_dfbbdd['DOCUMENTACIÓN'].replace(control3)
         nuevo_dfbbdd=nuevo_dfbbdd.drop(columns=['Contract Id','OLD Buckets' ])
@@ -529,9 +538,13 @@ def informe_solicitudes():
 
 
         nuevo_dfbbdd['ID CONTRATO'] = nuevo_dfbbdd.apply(lambda row: re.search(r'(?:C|c)(?:W|w)\s?\d{5,6}', row['CONTRATO']).group() if (pd.isna(row['ID CONTRATO']) or row['ID CONTRATO']=='') and re.search(r'(?:C|c)(?:W|w)\s?\d{5,6}', row['CONTRATO'])!=None else row['ID CONTRATO'] , axis=1)
-        print("por aca")
         nuevo_dfbbdd['ID CONTRATO'] = nuevo_dfbbdd.apply(lambda row: re.search(r'(?:C|c)(?:W|w)\s?\d{5,6}', row['NOTA INTERNA']).group() if (pd.isna(row['ID CONTRATO']) or row['ID CONTRATO']=='') and re.search(r'(?:C|c)(?:W|w)\s?\d{5,6}', row['NOTA INTERNA'])!=None else row['ID CONTRATO'] , axis=1)
         
+        print("aquio está el contrato en el nuevodffbb para que lo encuentr........")
+        fila_contrato = nuevo_dfbbdd.loc[nuevo_dfbbdd['ID CONTRATO'] == 'CW267265']
+        print(fila_contrato)
+        print("AQUI EL PRINT DE COLUMNS DE NUEVODFFBBSDD")
+        print(nuevo_dfbbdd.columns)
 
 
         condicion = (nuevo_dfbbdd['DOCUMENTACIÓN'] == '') & (nuevo_dfbbdd['ID CONTRATO'] != '') 
@@ -540,9 +553,72 @@ def informe_solicitudes():
         filas_a_actualizar = nuevo_dfbbdd.loc[condicion]
 
         for indice, fila in filas_a_actualizar.iterrows():
+            id_contrato = fila['ID CONTRATO']
+            fila_status_ariba = df_status_Ariba[df_status_Ariba['Contract Id'] == id_contrato]
+
+            if not fila_status_ariba.empty:
+                nuevo_valor_doc = fila_status_ariba['OLD Buckets'].values[0]
+
+                # Actualizar la columna 'DOCUMENTACIÓN'
+                nuevo_dfbbdd.at[indice, 'DOCUMENTACIÓN'] = nuevo_valor_doc
+
+                # Obtener los nuevos valores para las otras columnas
+
+                nuevo_inicio_lah = fila_status_ariba['Effective Date - Date'].values[0]
+                nuevo_fin_lah = fila_status_ariba['Expiration Date - Date'].values[0]
+                nuevo_owner = fila_status_ariba['Owner Name'].values[0]
+                nuevo_cif = fila_status_ariba['Supplier Tax ID'].values[0]
+                nuevo_nombre = fila_status_ariba['Supplier - Common Supplier'].values[0]
+
+                # Actualizar las otras columnas
+
+                nuevo_dfbbdd.at[indice, 'FECHA INICIO LAH'] = nuevo_inicio_lah
+                nuevo_dfbbdd.at[indice, 'FECHA FIN LAH'] = nuevo_fin_lah
+                nuevo_dfbbdd.at[indice, 'ANALISTA'] = nuevo_owner
+                nuevo_dfbbdd.at[indice, 'N.I.F proveedor'] = nuevo_cif
+                nuevo_dfbbdd.at[indice, 'Proveedor'] = nuevo_nombre
+                
+            
+            else:
+                # Si no hay coincidencia, dejar los valores originales en las otras columnas
+                pass  
+
+
+        for indice, fila in filas_a_actualizar.iterrows():
+            id_contrato = fila['ID CONTRATO']
+            fila_contract_ariba = df_contract_ariba[df_contract_ariba['Contract Id'] == id_contrato]
+
+            if not fila_contract_ariba.empty:
+                nuevo_valor_doc = fila_contract_ariba['OLD Buckets'].values[0]
+
+                # Actualizar la columna 'DOCUMENTACIÓN'
+                nuevo_dfbbdd.at[indice, 'DOCUMENTACIÓN'] = nuevo_valor_doc
+
+                # Obtener los nuevos valores para las otras columnas
+
+                nuevo_inicio_lah = fila_contract_ariba['Effective Date - Date'].values[0]
+                nuevo_fin_lah = fila_contract_ariba['Expiration Date - Date'].values[0]
+                nuevo_owner = fila_contract_ariba['Owner Name'].values[0]
+                nuevo_cif = fila_contract_ariba['Supplier Tax ID'].values[0]
+                nuevo_nombre = fila_contract_ariba['Supplier - Common Supplier'].values[0]
+
+                # Actualizar las otras columnas
+
+                nuevo_dfbbdd.at[indice, 'FECHA INICIO LAH'] = nuevo_inicio_lah
+                nuevo_dfbbdd.at[indice, 'FECHA FIN LAH'] = nuevo_fin_lah
+                nuevo_dfbbdd.at[indice, 'ANALISTA'] = nuevo_owner
+                nuevo_dfbbdd.at[indice, 'N.I.F proveedor'] = nuevo_cif
+                nuevo_dfbbdd.at[indice, 'Proveedor'] = nuevo_nombre
+            
+            else:
+                # Si no hay coincidencia, dejar los valores originales en las otras columnas
+                pass  
+
+
+        for indice, fila in filas_a_actualizar.iterrows():
             
             id_contrato = fila['ID CONTRATO']
-            nuevo_valor = df_status_Ariba.loc[df_status_Ariba['Contract Id'] == id_contrato, 'OLD Buckets'].values
+            nuevo_valor = df_contract_ariba.loc[df_contract_ariba['Contract Id'] == id_contrato, 'OLD Buckets'].values
             nuevo_dfbbdd.at[indice, 'DOCUMENTACIÓN'] = nuevo_valor[0] if len(nuevo_valor) > 0 else ''
 
         #antiguos
@@ -559,7 +635,7 @@ def informe_solicitudes():
         #nuevo_dfbbdd['DOCUMENTACIÓN'] = nuevo_dfbbdd.apply(lambda row: '1 - Sin información' if (pd.isna(row['DOCUMENTACIÓN']) or row['DOCUMENTACIÓN']=='') and row['TIPO SOLICITUD'] == '1. COMPRA PUNTUAL' else row['DOCUMENTACIÓN'], axis=1)
         nuevo_dfbbdd['DOCUMENTACIÓN'] = nuevo_dfbbdd.apply(lambda row: '1 - Pedido no comunicado' if (pd.isna(row['DOCUMENTACIÓN']) or row['DOCUMENTACIÓN']=='')  else row['DOCUMENTACIÓN'], axis=1)
 
-        
+        nuevo_dfbbdd['DOCUMENTACIÓN'] = nuevo_dfbbdd['DOCUMENTACIÓN'].replace(control3)
 
 
 
@@ -575,14 +651,19 @@ def informe_solicitudes():
         old_column_names_FINAL = ['N.I.F proveedor','Proveedor','Estado Solicitud','DOCUMENTACIÓN','F/ NOTIFICACIÓN\n','F/INICIO DE ACTIVIDAD','F/FIN DE ACTIVIDAD']
         new_column_names_FINAL = ['CIF Proveedor', 'Nombre Proveedor','Estado SAP','DOCUMENTACION','F. NOTIFICACIÓN\n','F/INICIO DE ACTIVIDAD ','F/FIN DE ACTIVIDAD ']      
         nuevo_dfbbdd=nuevo_dfbbdd.rename(columns=dict(zip(old_column_names_FINAL, new_column_names_FINAL)))
+        """
+        nuevo_dfbbdd['FECHA INICIO LAH'] = nuevo_dfbbdd['FECHA INICIO LAH'].replace('', pd.NA)
+        nuevo_dfbbdd['FECHA FIN LAH'] = nuevo_dfbbdd['FECHA FIN LAH'].replace('', pd.NA)
 
+        # Convertir la columna 'FECHA INICIO LAH' a formato datetime
+        nuevo_dfbbdd['FECHA INICIO LAH'] = pd.to_datetime(nuevo_dfbbdd['FECHA INICIO LAH'], errors='coerce', unit='D', origin='1899-12-30')
 
-
+        # Convertir la columna 'FECHA FIN LAH' a formato datetime
+        nuevo_dfbbdd['FECHA FIN LAH'] = pd.to_datetime(nuevo_dfbbdd['FECHA FIN LAH'], errors='coerce', unit='D', origin='1899-12-30')
+        """
         print('5')
-
         print(nuevo_dfbbdd.columns)
         print(dfbbdd_2023_final.columns)
-        time.sleep(10)
 
         nuevo_dfbbdd_final=pd.concat([dfbbdd_2023_final,nuevo_dfbbdd],ignore_index=True)
         nuevo_dfbbdd_final= nuevo_dfbbdd_final.drop(columns=['PROPUESTA'])
