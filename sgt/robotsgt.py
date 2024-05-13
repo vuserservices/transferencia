@@ -18,7 +18,7 @@ from io import BytesIO
 from openpyxl.styles import NamedStyle
 import win32com.client
 import re
-
+import datetime as dt
 
 
 site_url = "https://aquanimavdi.sharepoint.com/sites/DDBBCE"
@@ -74,30 +74,42 @@ print("INICIO")
 bbdd="./out_test.xlsx"#plantilla para cargar información
 bbdd_sp='./BBDD.xlsx'#traer de Sharepoint
 informe_sgt= './sgt/informesgt.xlsx' #traer de sharepoint
-contracts_ariba='./sgt/contratos.xlsx'
-sourcing_ariba='./sgt/sourcing.xlsx'
-df_sourcing_ariba=pd.read_excel(sourcing_ariba)
+contracts_ariba='./sgt/contratos.pkl'
 
-df_contract_ariba=pd.read_excel(contracts_ariba)
-df_contract_ariba['Contract Id'] = df_contract_ariba['Contract Id'].astype(str)
+sourcing_ariba='./sgt/sourcing.pkl'
+bbdd_contracts_2020=pd.read_excel(bbdd_sp,sheet_name="ARIBA")
+
+bbdd_complemento_solicitud=pd.read_excel(bbdd_sp,sheet_name="CONTRATOS")
+
+bbdd_complemento_solicitud.columns = bbdd_complemento_solicitud.iloc[0]
+
+bbdd_complemento_solicitud = bbdd_complemento_solicitud.iloc[1:]
+bbdd_complemento_solicitud=bbdd_complemento_solicitud.drop_duplicates()
+bbdd_complemento_solicitud['SOLICITUD']=bbdd_complemento_solicitud['SOLICITUD'].astype(str)
+bbdd_complemento_solicitud['IDCONTRATO']=bbdd_complemento_solicitud['IDCONTRATO'].astype(str).replace('\n','').replace(' ','').replace(r'\s+', '', regex=True)
+
+
+
+bbdd_contracts_2020=bbdd_contracts_2020.rename({'Estado Nv1': 'OLD Buckets','ID Contrato':'Contract Id','Fecha_Inicio_contrato':'Effective Date - Date','Fecha_Fin_Contrato':'Expiration Date - Date','Analista':'Owner Name'}, axis=1)
+bbdd_contracts_2020=bbdd_contracts_2020[['Contract Id','OLD Buckets','Effective Date - Date','Expiration Date - Date','Owner Name']]
+bbdd_contracts_2020['Contract Id']=bbdd_contracts_2020['Contract Id'].astype(str).replace('\n','').replace(' ','').replace(r'\s+', '', regex=True)
+
+df_sourcing_ariba=pd.read_pickle(sourcing_ariba)
+
+df_contract_ariba=pd.read_pickle(contracts_ariba)
+df_contract_ariba['Contract Id'] = df_contract_ariba['Contract Id'].astype(str).replace('\n','').replace(' ','').replace(r'\s+', '', regex=True)
+
+df_contract_ariba=pd.concat([df_contract_ariba,bbdd_contracts_2020], ignore_index=True)
 
 
 df_sourcing_ariba['Cost Line ID2']=df_sourcing_ariba['Cost Line ID'].replace({'-0000000001': '', '-0000000002': ''}, regex=True)
-df_sourcing_ariba['Associated CW2'] = df_sourcing_ariba['Associated CW'].str.split('[', n=1).str[0].str.replace(' ', '')
+df_sourcing_ariba['Associated CW2'] = df_sourcing_ariba['Associated CW'].str.split('[', n=1).str[0].str.replace(' ', '').replace('\n','').replace(' ','').replace(r'\s+', '', regex=True)
 df_sourcing_ariba= df_sourcing_ariba.drop(columns=['Owner Name'])
 
 
-print(df_contract_ariba.columns)
 df_status_Ariba = pd.merge(df_sourcing_ariba, df_contract_ariba[['Contract Id', 'OLD Buckets','Owner Name','Effective Date - Date','Expiration Date - Date','Supplier - Common Supplier','Supplier Tax ID']], how='left', left_on='Associated CW2', right_on='Contract Id')
 #"con este df se busca la columna documentacion de nuevabbddd para las s olicitudes que no tienen contrato escrito dentoer de las bases"
-print(df_status_Ariba.columns)
 df_status_Ariba = df_status_Ariba[['Cost Line ID2','OLD Buckets','Contract Id','Owner Name','Effective Date - Date','Expiration Date - Date','Supplier - Common Supplier','Supplier Tax ID']]
-
-
-print(df_status_Ariba.columns)
-
-fila_contrato = df_contract_ariba.loc[df_contract_ariba['Contract Id'] == 'CW267265']
-print(fila_contrato)
 
 #region Filtros
 control= ["4. CONTRATACIÓN DOTACIÓN DE FONDOS","5D.AUDITORÍA ANUAL DE CUENTAS","5F2.PRESIDENCIA-ALTA DIRECCIÓN","5F3.ESTRATÉGICOS.OPERATIVOS.NEGOCIO","5F3.ESTRATÉGICOS.OPERATIVOS.NEGOCIO",
@@ -107,9 +119,10 @@ control= ["4. CONTRATACIÓN DOTACIÓN DE FONDOS","5D.AUDITORÍA ANUAL DE CUENTAS
 control2=['1. COMPRA PUNTUAL','5A.PROVEEDOR INTRAGRUPO','SIN SOLICITUD']
 
 control3= {'01.Elaboración AQN':'4 - Elaboración AQN',	'01. Elaboración':'4 - Elaboración AQN',	'05.Validación Usuario':'7 - Validación Usuario',	'08.Pend. enviar a validación AJ':'8 - Validación de AAJJ',	'09.Validación Asesoría Jurídica':'8 - Validación de AAJJ',	'1. Elaboration':'4 - Elaboración AQN',	'14.Pend. activar/enviar firma Proveedor':'9 - En firma de proveedor',	'6. En firma':'9 - En firma de proveedor',	'15.Firma Proveedor':'9 - En firma de proveedor',	'17.Firma Electrónica':'9 - En firma de proveedor',	'18. Alegaciones de Proveedor':'8 - Alegaciones del proveedor',	'19.Pend. enviar a firma Cliente':'9 - Firma Cliente',	'2. User Validation':'7 - Validación Usuario',	'20.Firma Cliente':'9 - Firma Cliente',	'3. Legal':'8 - Validación de AAJJ',	'5. Supplier Validation':'8 - Revisión proveedor',	'09. En Firma Proveedor':'9 - En firma de proveedor',	'6. Supplier Signature':'9 - En firma de proveedor',	'7. Distribution':'9 - Firmado',	'Alegaciones del proveedor':'8 - Alegaciones del proveedor',	'BORRADA':'1 - Solicitud borrada',	'Cancelado':'2 - Cancelado',	'DEVUELTA':'2 - Solicitud devuelta',	'Dotación':'9 - Dotación',	'Elaboración AQN':'4 - Elaboración AQN',	'Elaboración proveedor':'6 - Elaboración proveedor',	'01. Elaboración proveedor':'6 - Elaboración proveedor',	'Elevado al Foro':'2 - Elevado al Foro',
-           	'En negociación':'3 - En negociación',	'Excepción':'1 - Excepción',	'Firma de cliente':'9 - Firma Cliente',	'Firma proveedor':'9 - En firma de proveedor',	'9. En Firma Proveedor':'9 - En firma de proveedor',	'Firmado':'9 - Firmado',	'Gestor del servicio':'7 - Gestor del servicio',	'Intragrupo':'1 - Intragrupo',	'NO NECESARIA GESTIÓN':'1 - No precisa formalización',	'No scope AQN':'1 - No scope AQN',	'ON HOLD':'ON HOLD',	'OT proveedor':'6 - Elaboración proveedor',	'Pdte asignación abogado':'8 - Validación de AAJJ',	'Pdte confirmación cancelación':'1 - Pdte confirmación cancelación',	'Pdte elevar al cliente':'2 - Pte elevar al cliente',	'Pdte elevar al foro':'2 - Pte elevar al foro',	'Pdte homologación':'1 - Pdte homologación',	'Pdte info usuario':'1 - Pdte info usuario',	'Pdte localizar CW':'3 - Pdte localizar CW',	'Pedido no comunicado':'1 - Pedido no comunicado',	'Pendiente de Borrado':'1 - Solicitud borrada',	'Pendiente Marco':'8 - Pediente de Marco',	'Pendiente de MSA':'8 - Pediente de Marco',	'05. Pendiente MSA':'8 - Pediente de Marco',	'Pendiente del Marco':'8 - Pediente de Marco',	'RENOVACIÓN':'1 - Sin información',	'Revisión AQN':'4 - En revisión AQN',	'Pdte info AQN':'4 - En revisión AQN',	'10. Pendiente publicar':'7 - Pendiente publicar',	'8. Pendiente avanzar por propietario':'7 - Pendiente avanzar tarea',
+           	'En negociación':'3 - En negociación',	'Excepción':'1 - Excepción',	'Firma de cliente':'9 - Firma Cliente',	'Firma proveedor':'9 - En firma de proveedor',	'9. En Firma Proveedor':'9 - En firma de proveedor',	'Firmado':'9 - Firmado',	'Gestor del servicio':'7 - Gestor del servicio',	'Intragrupo':'1 - Intragrupo',	'NO NECESARIA GESTIÓN':'1 - No precisa formalización',	'No scope AQN':'1 - No scope AQN',	'ON HOLD':'ON HOLD',	'OT proveedor':'6 - Elaboración proveedor',	'Pdte asignación abogado':'8 - Validación de AAJJ',	'Pdte confirmación cancelación':'1 - Pdte confirmación cancelación',	'Pdte elevar al cliente':'2 - Pte elevar al cliente',	'Pdte elevar al foro':'2 - Pte elevar al foro',	'Pdte homologación':'1 - Pdte homologación',	'Pdte info usuario':'1 - Pdte info usuario',	'Pdte localizar CW':'3 - Pdte localizar CW',	'Pedido no comunicado':'1 - Pedido no comunicado',	'Pendiente de Borrado':'1 - Solicitud borrada',	'Pendiente Marco':'8 - Pediente de Marco',	'Pendiente de MSA':'8 - Pediente de Marco',	'05. Pendiente MSA':'8 - Pediente de Marco',	'Pendiente del Marco':'8 - Pediente de Marco',	'RENOVACIÓN':'1 - Sin información',	'Revisión AQN':'4 - En revisión AQN',	'Pdte info AQN':'4 - En revisión AQN',	'10. Pendiente publicar':'7 - Pendiente publicar',	'8. Pendiente avanzar por propietario':'7 - Pendiente avanzar tarea','05. Revisión alegaciones por Dpto. Jurídico':'8 - Validación de AAJJ',
             '08. Pendiente avanzar por propietario':'7 - Pendiente avanzar tarea',	'4. Owner Validation':'7 - Pendiente avanzar tarea',	'04. Validación por proveedor':'8 - Revisión proveedor',	'Revisión proveedor':'8 - Revisión proveedor',	'Sin información':'1 - Sin información',	'02. Revisión por Dpto. Jurídico':'8 - Validación de AAJJ',	'Validación de AAJJ':'8 - Validación de AAJJ',	'Validación de costes':'8 - Validación de costes',	'4. Validación por proveedor':'8 - Revisión proveedor',	'8. Firmado':'9 - Firmado',	'05. Revisión alegaciones por Equipo Datos':'8 - Validación de AAJJ',	'5. Revisión alegaciones por Ciberseguridad':'8 - Validación de AAJJ',	'2. Revisión por Dpto. Jurídico':'8 - Validación de AAJJ',	'0. Initiation':'4 - Elaboración AQN',	'Pendiente de Contrato Marco':'8 - Pediente de Marco',	'Pendiente MSA':'8 - Pediente de Marco',	'Pendiente de firma MSA':'8 - Pediente de Marco',	'06. Validación por Costes':'8 - Validación de costes',	'6. Validación por Costes':'8 - Validación de costes',	'02. Validación usuario':'7 - Validación Usuario',	'VALIDACIÃ“N USUARIO':'7 - Validación Usuario',	'Pendiente de validaciÃ³n por parte de usuario':'7 - Validación Usuario',	'RevisiÃ³n de usuario':'7 - Validación Usuario',	'Validación usuario':'7 - Validación Usuario',	'Pte info Accenture':'1- Pte info Accenture',	'Aclaración':'1 - Aclaración',	'05. Revisión alegaciones por Gestor Servicio':'8 - Validación de AAJJ'
-}
+            ,'1. Elaboration':'4 - Elaboración AQN', '10. Cancelled':'2 - Cancelado','2. User Validation':'7 - Validación Usuario','9. Signed':'9 - Firmado'
+            }   
 
 hojas_a_mantener_sgt = ["CONTRATOS MARCO SGT", "Histórico Solicitudes", "PROVEEDORES INFORMACION MERCADO","RC","CONTROL", "ARIBA"]
 hojas_a_mantener_cliente = ["CONTRATOS MARCO SGT", "RC"]
@@ -121,8 +134,7 @@ filtros_dfbbdd2024=  [ '9 - Firmado','8 - Revisión proveedor',
            '4 - Elaboración AQN', '1 - Pedido no comunicado', '1 - Aclaración', '8 - Pediente de Marco', 
             '9 - Firma Cliente', '1 - Pdte homologación', 'ON HOLD']
 
-filtros_dfbbdd2023=  [ '1 - Intragrupo', '1 - Solicitud borrada',
-           '2 - Solicitud devuelta',  '2 - Cancelado', '1 - Pedido no comunicado']
+
 
 
 def convert_to_float(x):
@@ -299,15 +311,17 @@ def informe_solicitudes():
         #dfsolicitudesaqn= pd.read_excel(bbdd_sp,sheet_name="SOLICITUDES AQN")
         dfbbdd= pd.read_excel(bbdd_sp,sheet_name='SOLICITUDES')
         dfrc= pd.read_excel(bbdd_sp,sheet_name="RC")
+
+
         dfrc['id servicio'] = dfrc['id servicio'].astype('object')
-        idioma_rc= {'Crítico':'Critical','Alto':'High','Medio':'Medium','Bajo':'Low','Sin riesgo':'No Risk','Muy bajo':'Very low'}
+        idioma_rc= {'Crítico':'Critical','Alto':'High','Medio':'Medium','Bajo':'Low','Sin riesgo':'No Risk','Muy bajo':'Very low','Sin Riesgo':'No Risk'}
 
         dfrc['RISK'] = dfrc['RISK'].replace(idioma_rc)
 
         dfrc['Relevance'] = dfrc['Relevance'].replace(idioma_rc)
 
 
-        wb = load_workbook('BBDDpruebas.xlsx', read_only=True)
+        wb = load_workbook('BBDD.xlsx', read_only=True)
         hojas_a_eliminar = ["CRUCE", "SOLICITUDES", "PEDIDOS", "LAH"]
         # Elimina la hoja deseada (reemplaza 'Nombre_Hoja' con el nombre de la hoja que deseas eliminar)
         for nombre_hoja in hojas_a_eliminar:
@@ -328,12 +342,11 @@ def informe_solicitudes():
 
         #dfoc=pd.read_html('./sgt/Seguimiento de pedidos.xls')[0] ##cuadno viene como XLS
         dfoc=pd.read_excel('./sgt/Seguimiento de pedidos.xlsx')
-        #dfoc = dfoc.iloc[57:]
+        dfoc = dfoc.iloc[57:]
 
-        #dfoc.columns = dfoc.iloc[0]
+        dfoc.columns = dfoc.iloc[0]
 
-        #dfoc = dfoc.iloc[1:]
-        print(dfoc.columns)
+        dfoc = dfoc.iloc[1:]
 
         dfoc=dfoc[dfoc['Estado Pedido']=="Pedido"]
 
@@ -346,22 +359,20 @@ def informe_solicitudes():
 
         dfsol = dfsol.iloc[1:]
         print("POR ACA VA SOLICITUDES...")
-        print(dfsol.columns)
         dfsol=dfsol.drop(columns=['Solicitud','Organismo aprobador','Nº Negociación', 'Estado Negociación', 'Nº Contrato'])
         dfsol['Inicio de Actividad'] = dfsol['Inicio de Actividad'].str.replace('.', '/')
 
         # Reemplazar puntos por barras en 'Fin de Actividad'
         dfsol['Fin de Actividad'] = dfsol['Fin de Actividad'].str.replace('.', '/')
-        print(dfsol.columns)
 
 
         ########
 
         i=datetime.now()
         #contratos de sharepoint dashboard LAH
-        dfcontract='./sgt/contratos.xlsx' ###CAMBIAR AL ARCHIVO QUE REALMENTE VA A LEER
+        dfcontract='./sgt/contratos.pkl' ###CAMBIAR AL ARCHIVO QUE REALMENTE VA A LEER
 
-        dfcontract=pd.read_excel(dfcontract)
+        dfcontract=pd.read_pickle(dfcontract)
         dfcontract= dfcontract.drop(columns=['COMMODITIES', 'Buckets CLAR', 'Stock US', 'Retirar CORP', 'Stock MX', 'Stock BR', 'Associated Team'])
 
         #HOJA CONTRATOS de archivo sharepoint
@@ -384,8 +395,7 @@ def informe_solicitudes():
         df=df[df['AÑO']=="2024"]
         df=df.rename({'PROPUESTA': 'Propuesta'}, axis=1)
 
-        print(df)
-        print(df['F/INICIO DE ACTIVIDAD'])
+
 
 
         ###########
@@ -397,15 +407,47 @@ def informe_solicitudes():
         dfbbdd = dfbbdd.iloc[1:]
 
         dfbbdd_2023=dfbbdd[dfbbdd["AÑO"]!=2024]
+
         dfbbdd= dfbbdd[dfbbdd["AÑO"]==2024]
-        dfbbdd_2023_2 = dfbbdd[dfbbdd['DOCUMENTACION'].isin(filtros_dfbbdd2023)] #del df2024 en bbdd que está OK, así no se modifica
         
-        
-        dfbbdd = dfbbdd[dfbbdd['DOCUMENTACION'].isin(filtros_dfbbdd2024)]#filtramos todo lo que se modifica
+
+        dfbbdd_2023_final = dfbbdd_2023
+        #dfbbdd_2023_final = dfbbdd_2023_final.iloc[:, :45]
+        dfbbdd_2023_final['ID CONTRATO'] = dfbbdd_2023_final['ID CONTRATO'].astype(str).replace('cw', 'CW').replace('\n','').replace(' ','').replace(r'\s+', '', regex=True)
 
 
-        dfbbdd_2023_final = pd.concat([dfbbdd_2023, dfbbdd_2023_2],ignore_index=True)
-        dfbbdd_2023_final = dfbbdd_2023_final.iloc[:, :45]
+                      
+        condicion =  (dfbbdd_2023_final['ID CONTRATO'] != '') 
+
+
+        filas_a_actualizar = dfbbdd_2023_final.loc[condicion]
+
+        for indice, fila in filas_a_actualizar.iterrows():
+            id_contrato = fila['ID CONTRATO']
+            fila_contract_ariba = df_contract_ariba[df_contract_ariba['Contract Id'] == id_contrato]
+
+            if not fila_contract_ariba.empty:
+                nuevo_valor_doc = fila_contract_ariba['OLD Buckets'].values[0]
+
+                dfbbdd_2023_final.at[indice, 'DOCUMENTACION'] = nuevo_valor_doc
+
+                # Obtener los nuevos valores para las otras columnas
+
+                nuevo_inicio_lah = fila_contract_ariba['Effective Date - Date'].values[0]
+                nuevo_fin_lah = fila_contract_ariba['Expiration Date - Date'].values[0]
+                nuevo_owner = fila_contract_ariba['Owner Name'].values[0]
+
+
+                # Actualizar las otras columnas
+
+                dfbbdd_2023_final.at[indice, 'FECHA INICIO LAH'] = nuevo_inicio_lah
+                dfbbdd_2023_final.at[indice, 'FECHA FIN LAH'] = nuevo_fin_lah
+                dfbbdd_2023_final.at[indice, 'ANALISTA'] = nuevo_owner
+            
+            else:
+                # Si no hay coincidencia, dejar los valores originales en las otras columnas
+                pass  
+
 
 
         
@@ -421,7 +463,6 @@ def informe_solicitudes():
         columnas_fecha = ['F/ APROBACIÓN','F/INICIO DE ACTIVIDAD', 'F/FIN DE ACTIVIDAD', 'F/DOCUMENTO SUBSIGUIENTE', 'F/ NOTIFICACIÓN\n']
 
 
-
         # Convertir la columna PNETO a tipo float, reemplazando cualquier valor no convertible por 0.0
         dfbbdd['P/NETO'] = dfbbdd['P/NETO'].apply(convert_to_float)
         # Cambiar el formato de las columnas de 'Y/m/d' a 'd/m/Y'
@@ -432,20 +473,27 @@ def informe_solicitudes():
 
         
 
-        ######
+        ###### AQUI SE JUNTA LA BBDD Y SGT TAMBIEN HABRÁN REPETIDOS
 
+
+        
         nuevo_dfbbdd = pd.concat([dfbbdd, df], ignore_index=True)
+ 
+        
+
+  
  
 
 
-        #nuevo_dfbbdd = nuevo_dfbbdd.drop_duplicates(subset='Propuesta', keep='first')
-
-        print("aqui esta el print despeyus del drop")
         nuevo_dfbbdd.drop(nuevo_dfbbdd.columns[24],axis=1)
-        print(nuevo_dfbbdd.columns)
+
         #nuevo_dfbbdd.insert(0, columna.name, columna)
   
         nuevo_dfbbdd=nuevo_dfbbdd.drop(columns=['PROPUESTA'])
+        nuevo_dfbbdd = nuevo_dfbbdd.drop_duplicates(keep='last')
+
+
+        print("aqui esta el print despeyus del drop")
 
 
 
@@ -471,7 +519,7 @@ def informe_solicitudes():
         nuevo_dfbbdd['DOCUMENTACIÓN'] = np.where(nuevo_dfbbdd['DOCUMENTACIÓN']=='', nuevo_dfbbdd['Contract Id'], nuevo_dfbbdd['DOCUMENTACIÓN'])
         #luego lo mismo con documentación, pero no solo los vacíos.
         nuevo_dfbbdd=nuevo_dfbbdd.drop(columns=['SOLICITUD000', 'Cost Line ID2','Contract Id' ])
-        nuevo_dfbbdd['ID CONTRATO']=nuevo_dfbbdd['ID CONTRATO'].astype(str)
+        nuevo_dfbbdd['ID CONTRATO']=nuevo_dfbbdd['ID CONTRATO'].astype(str).replace('\n','').replace(' ','').replace(r'\s+', '', regex=True)
         nuevo_dfbbdd=pd.merge(nuevo_dfbbdd,df_contract_ariba[['Contract Id','OLD Buckets','Owner Name','Effective Date - Date', 'Expiration Date - Date']],how='left',left_on='ID CONTRATO' ,right_on='Contract Id')
         
         nuevo_dfbbdd['DOCUMENTACIÓN'] = np.where(nuevo_dfbbdd['DOCUMENTACIÓN']=='' , nuevo_dfbbdd['OLD Buckets'], nuevo_dfbbdd['DOCUMENTACIÓN'])
@@ -541,10 +589,8 @@ def informe_solicitudes():
         nuevo_dfbbdd['ID CONTRATO'] = nuevo_dfbbdd.apply(lambda row: re.search(r'(?:C|c)(?:W|w)\s?\d{5,6}', row['NOTA INTERNA']).group() if (pd.isna(row['ID CONTRATO']) or row['ID CONTRATO']=='') and re.search(r'(?:C|c)(?:W|w)\s?\d{5,6}', row['NOTA INTERNA'])!=None else row['ID CONTRATO'] , axis=1)
         
         print("aquio está el contrato en el nuevodffbb para que lo encuentr........")
-        fila_contrato = nuevo_dfbbdd.loc[nuevo_dfbbdd['ID CONTRATO'] == 'CW267265']
-        print(fila_contrato)
-        print("AQUI EL PRINT DE COLUMNS DE NUEVODFFBBSDD")
-        print(nuevo_dfbbdd.columns)
+
+        nuevo_dfbbdd['ID CONTRATO'] = nuevo_dfbbdd['ID CONTRATO'].astype(str).replace('cw', 'CW').replace('\n','').replace(' ','').replace(r'\s+', '', regex=True)
 
 
         condicion = (nuevo_dfbbdd['DOCUMENTACIÓN'] == '') & (nuevo_dfbbdd['ID CONTRATO'] != '') 
@@ -575,8 +621,8 @@ def informe_solicitudes():
                 nuevo_dfbbdd.at[indice, 'FECHA INICIO LAH'] = nuevo_inicio_lah
                 nuevo_dfbbdd.at[indice, 'FECHA FIN LAH'] = nuevo_fin_lah
                 nuevo_dfbbdd.at[indice, 'ANALISTA'] = nuevo_owner
-                nuevo_dfbbdd.at[indice, 'N.I.F proveedor'] = nuevo_cif
-                nuevo_dfbbdd.at[indice, 'Proveedor'] = nuevo_nombre
+                #nuevo_dfbbdd.at[indice, 'N.I.F proveedor'] = nuevo_cif
+                #nuevo_dfbbdd.at[indice, 'Proveedor'] = nuevo_nombre
                 
             
             else:
@@ -607,8 +653,8 @@ def informe_solicitudes():
                 nuevo_dfbbdd.at[indice, 'FECHA INICIO LAH'] = nuevo_inicio_lah
                 nuevo_dfbbdd.at[indice, 'FECHA FIN LAH'] = nuevo_fin_lah
                 nuevo_dfbbdd.at[indice, 'ANALISTA'] = nuevo_owner
-                nuevo_dfbbdd.at[indice, 'N.I.F proveedor'] = nuevo_cif
-                nuevo_dfbbdd.at[indice, 'Proveedor'] = nuevo_nombre
+                #nuevo_dfbbdd.at[indice, 'N.I.F proveedor'] = nuevo_cif
+                #nuevo_dfbbdd.at[indice, 'Proveedor'] = nuevo_nombre
             
             else:
                 # Si no hay coincidencia, dejar los valores originales en las otras columnas
@@ -639,6 +685,23 @@ def informe_solicitudes():
 
 
 
+        condicion = (nuevo_dfbbdd['DOCUMENTACIÓN'] == '1 - Sin información')
+
+
+        filas_a_actualizar = nuevo_dfbbdd.loc[condicion]
+        for indice, fila in filas_a_actualizar.iterrows():
+            id_solicitud = fila['SOLICITUD']
+            fila_solicitud_bbdd = bbdd_complemento_solicitud[bbdd_complemento_solicitud['SOLICITUD'] == id_solicitud]
+
+            if not fila_solicitud_bbdd.empty:
+                nuevo_valor_documentacion = fila_solicitud_bbdd['DOCUMENTACIÓN'].values[0] #valor de hoja "conrtatos"
+
+                nuevo_dfbbdd.at[indice, 'DOCUMENTACIÓN'] = nuevo_valor_documentacion
+            
+            else:
+                # Si no hay coincidencia, dejar los valores originales en las otras columnas
+                pass  
+
         #buscar contrato s en columna NOTA INTERNA o CONTrato
         nuevo_dfbbdd["COUNT"]=1
         nuevo_dfbbdd=nuevo_dfbbdd.rename({'PROPUESTA': 'Propuesta'}, axis=1)#,'PROVEEDOR3':'PROVEEDOR'
@@ -651,28 +714,33 @@ def informe_solicitudes():
         old_column_names_FINAL = ['N.I.F proveedor','Proveedor','Estado Solicitud','DOCUMENTACIÓN','F/ NOTIFICACIÓN\n','F/INICIO DE ACTIVIDAD','F/FIN DE ACTIVIDAD']
         new_column_names_FINAL = ['CIF Proveedor', 'Nombre Proveedor','Estado SAP','DOCUMENTACION','F. NOTIFICACIÓN\n','F/INICIO DE ACTIVIDAD ','F/FIN DE ACTIVIDAD ']      
         nuevo_dfbbdd=nuevo_dfbbdd.rename(columns=dict(zip(old_column_names_FINAL, new_column_names_FINAL)))
-        """
-        nuevo_dfbbdd['FECHA INICIO LAH'] = nuevo_dfbbdd['FECHA INICIO LAH'].replace('', pd.NA)
-        nuevo_dfbbdd['FECHA FIN LAH'] = nuevo_dfbbdd['FECHA FIN LAH'].replace('', pd.NA)
 
-        # Convertir la columna 'FECHA INICIO LAH' a formato datetime
-        nuevo_dfbbdd['FECHA INICIO LAH'] = pd.to_datetime(nuevo_dfbbdd['FECHA INICIO LAH'], errors='coerce', unit='D', origin='1899-12-30')
-
-        # Convertir la columna 'FECHA FIN LAH' a formato datetime
-        nuevo_dfbbdd['FECHA FIN LAH'] = pd.to_datetime(nuevo_dfbbdd['FECHA FIN LAH'], errors='coerce', unit='D', origin='1899-12-30')
-        """
         print('5')
-        print(nuevo_dfbbdd.columns)
-        print(dfbbdd_2023_final.columns)
+
 
         nuevo_dfbbdd_final=pd.concat([dfbbdd_2023_final,nuevo_dfbbdd],ignore_index=True)
         nuevo_dfbbdd_final= nuevo_dfbbdd_final.drop(columns=['PROPUESTA'])
+        nuevo_dfbbdd_final['DOCUMENTACION'] = nuevo_dfbbdd_final['DOCUMENTACION'].replace(control3)
+
+        idioma_rc= {'Crítico':'Critical','Alto':'High','Medio':'Medium','Bajo':'Low','Sin Riesgo':'No Risk','Muy bajo':'Very low','Sin riesgo':'No Risk'}
+
+        nuevo_dfbbdd_final['Tipologia de Riesgo'] = nuevo_dfbbdd_final['Tipologia de Riesgo'].replace(idioma_rc)
+        nuevo_dfbbdd_final[['F/ APROBACIÓN','F/FIN DE ACTIVIDAD ', 'F/INICIO DE ACTIVIDAD ', 'F/DOCUMENTO SUBSIGUIENTE', 'F. NOTIFICACIÓN\n']] = nuevo_dfbbdd_final[['F/ APROBACIÓN','F/FIN DE ACTIVIDAD ', 'F/INICIO DE ACTIVIDAD ', 'F/DOCUMENTO SUBSIGUIENTE', 'F. NOTIFICACIÓN\n']].applymap(lambda x: x.replace('.', '/') if isinstance(x, str) else x)
+        dfbbdd_2023_final['F/FIN DE ACTIVIDAD '] = dfbbdd_2023_final['F/FIN DE ACTIVIDAD '].str.replace('.', '/')
+
+        #nuevo_dfbbdd_final['FECHA INICIO LAH'] = nuevo_dfbbdd_final['FECHA INICIO LAH'].fillna('').replace('', 0).astype(int)
+        #nuevo_dfbbdd_final['FECHA FIN LAH'] = nuevo_dfbbdd_final['FECHA FIN LAH'].fillna('').replace('', 0).astype(int)
+        #nuevo_dfbbdd_final['FECHA INICIO LAH'] = pd.TimedeltaIndex(nuevo_dfbbdd_final['FECHA INICIO LAH'], unit='d') + dt.datetime(1900,1,1)
+        #nuevo_dfbbdd_final['FECHA FIN LAH'] = pd.TimedeltaIndex(nuevo_dfbbdd_final['FECHA FIN LAH'], unit='d') + dt.datetime(1900,1,1)
+
+
+        nuevo_dfbbdd_final=nuevo_dfbbdd_final.drop_duplicates()
+
 
         print('AQUI PASANDO A EXCEL CON INDEX FALSE')
         nuevo_dfbbdd_final.to_excel('archivolisto_excel.xlsx',index=False)
 
         print("creado el archivo Excel")
-        print('aqui hay un time sleep')
 
         dfs_a_agregar_sgt = {"SOLICITUDES": nuevo_dfbbdd_final, "CRUCE": dfsol, "PEDIDOS": dfoc, "ESTADO MES":dffechas}#"LAH": dfcontratos,
         archivo_origen_sgt = 'BBDD.xlsx'
@@ -680,7 +748,7 @@ def informe_solicitudes():
         crear_archivo_SGT(archivo_origen_sgt, archivo_destino_sgt, hojas_a_mantener_sgt, dfs_a_agregar_sgt)
 
         dfs_a_agregar_cliente = {"CRUCE": dfsol, "SOLICITUDES": nuevo_dfbbdd_final}#"LAH": dfcontratos,
-        archivo_origen_cliente = 'BBDDpruebas.xlsx'
+        archivo_origen_cliente = 'BBDD.xlsx'
         archivo_destino_cliente = 'plantilla.xlsx'
         #crear_archivo_cliente(archivo_origen_cliente,archivo_destino_cliente,hojas_a_mantener_cliente,dfs_a_agregar_cliente)
 
