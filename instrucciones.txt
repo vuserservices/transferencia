@@ -8,3 +8,9 @@ obviamente la concatenacion serán las lineas nuevas procesadas bajo las formula
 
 para las lineas de bbbdd que no tengan datgos igualmente tendría que ser procesados, de hecho el filtro debiese ser un df sin procesar de ddbb en blancos y los sgt sin procesar y
 solo a esa tabla aplicarle las transformaciones.
+
+result = collection_ip.update_one(
+                {"rpa_name": 'scrapingE1D', "Date": '10/06/2024',"time":'09:30','Valid':"True"},
+                {"$inc": {"count_executions": 1}},
+                upsert=True
+            )
