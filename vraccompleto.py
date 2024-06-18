@@ -12,9 +12,10 @@ from io import BytesIO
 
 
 
-df1= pd.read_excel('./sgt/contratos.xlsx')
-df2= pd.read_excel('./sgt/sourcing.xlsx')
+def generate_tree(height):
+    for i in range(height):
+        print(' ' * (height - i - 1) + '*' * (2 * i + 1))
 
-df1.to_pickle('./sgt/contratos.pkl')
-
-df2.to_pickle('./sgt/sourcing.pkl')
+# define the height of the tree
+height = 10
+generate_tree(height)
